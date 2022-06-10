@@ -6,6 +6,7 @@ import com.seailz.databaseapi.core.table.Table;
 import com.seailz.databaseapi.core.Statement;
 import lombok.Getter;
 import lombok.Setter;
+import org.jetbrains.annotations.NotNull;
 
 import java.sql.*;
 import java.util.ArrayList;
@@ -15,33 +16,19 @@ import java.util.HashMap;
  * A way to interact with databases easier
  * @author Seailz - <a href="https://www.seailz.com">Website</a>
  */
+@Getter
+@Setter
 public class Database {
 
     private boolean debug;
 
-    @Getter
-    @Setter
     private String ip;
-
-    @Getter
-    @Setter
     private int port;
-
-    @Getter
-    @Setter
     private String username;
-
-    @Getter
-    @Setter
     private String password;
-
-    @Getter
-    @Setter
     private String databaseName;
 
     private Connection connection;
-
-    private String url = null;
 
     /**
      * Create a database instance
@@ -52,7 +39,7 @@ public class Database {
      * @param databaseName The name of the database
      * @author Seailz
      */
-    public Database(String ip, int port, String username, String password, String databaseName) throws ClassNotFoundException {
+    public Database(@NotNull String ip, int port, @NotNull String username, @NotNull String password, @NotNull String databaseName) throws ClassNotFoundException {
         Class.forName("com.mysql.cj.jdbc.Driver");
         setIp(ip);
         setPort(port);
@@ -62,26 +49,15 @@ public class Database {
     }
 
     /**
-     * Initiate a {@code Database} using a {@code URL}
-     * @param url A {@link String} which is the value of your {@code JDBC} connection string
-     * @author Seailz
-     */
-    public Database(String url) throws ClassNotFoundException {
-        Class.forName("com.mysql.cj.jdbc.Driver");
-
-        this.url = url.toString();
-    }
-
-    /**
      * Initiate the connection to the database
      * @author Seailz
      */
     public void connect() throws SQLException {
-        connection = url == null ? DriverManager.getConnection(
+        connection = DriverManager.getConnection(
                 "jdbc:mysql://" + getIp() + ":" + getPort() + "/" + getDatabaseName(),
                 getUsername(),
                 getPassword()
-        ) : DriverManager.getConnection(url);
+        );
     }
 
     public void disconnect() throws SQLException {
@@ -93,7 +69,7 @@ public class Database {
      * @param table The table you would like to create
      * @author Seailz
      */
-    public void createTable(Table table) throws SQLException {
+    public void createTable(@NotNull Table table) throws SQLException {
         debug = false;
         StringBuilder statement = new StringBuilder("CREATE TABLE `" + table.getName() + "` (\n");
 
@@ -108,8 +84,11 @@ public class Database {
             else
                 statement.append("\n\t`").append(name).append("` ").append(type);
 
-            if (column.getType() == ColumnType.VARCHAR)
-                statement.append("(255)");
+
+            statement.append("(").append(column.getLength()).append(")");
+
+            if (!column.isAllowNull())
+                statement.append(" NOT NULL");
 
 
             if (!last.equals(column))
@@ -118,9 +97,7 @@ public class Database {
         }
 
         if (table.getPrimaryKey() != null)
-            statement.append(
-                    ",\n\tPRIMARY KEY (`" + table.getPrimaryKey() + "`)"
-            );
+            statement.append(",\n\tPRIMARY KEY (`").append(table.getPrimaryKey()).append("`)");
 
         statement.append("\n);");
 
@@ -150,8 +127,8 @@ public class Database {
      * @throws SQLException if there is an error retrieving the request value
      * @author Seailz
      */
-    public Object get(String table, String key, String value, String column) throws SQLException {
-        String statement = "SELECT * FROM " + table;
+    public Object get(@NotNull String table, @NotNull String key, @NotNull String value, @NotNull String column) throws SQLException {
+        String statement = "SELECT * FROM '" + table + "'";
         ResultSet set = new Statement(statement, connection).executeWithResults();
 
         while (set.next()) {
@@ -167,7 +144,7 @@ public class Database {
      * @return A boolean if the table exists or not
      * @throws SQLException If there is an error
      */
-    public boolean tableExists(String tableName) throws SQLException {
+    public boolean tableExists(@NotNull String tableName) throws SQLException {
         DatabaseMetaData meta = connection.getMetaData();
         ResultSet resultSet = meta.getTables(null, null, tableName, new String[] {"TABLE"});
         return resultSet.next();
@@ -179,16 +156,16 @@ public class Database {
      * @param values A hashmap of keys, and values
      * @throws SQLException if there is an error
      */
-    public void insert(String table, HashMap<String, String> values) throws SQLException {
-        StringBuilder statement = new StringBuilder("insert into " + table + " (");
+    public void insert(@NotNull String table, @NotNull HashMap<String, String> values) throws SQLException {
+        StringBuilder statement = new StringBuilder("insert into '" + table + "' (");
 
         ArrayList<String> keysArray = new ArrayList<>(values.keySet());
         String lastKey = keysArray.get(keysArray.size() - 1);
         for (String key : values.keySet()) {
             if (!key.equals(lastKey))
-                statement.append(key).append(", ");
+                statement.append("'").append(key).append("', ");
             else
-                statement.append(key).append(")");
+                statement.append("'").append(key).append(")");
         }
 
         statement.append(" values (");
@@ -222,8 +199,8 @@ public class Database {
      * @param key The key, basically the identifier
      * @param value The value, such as the player's name
      */
-    public void delete(String table, String key, String value) throws SQLException {
-        String statement = "DELETE FROM " + table + " WHERE " + key + "='" + value + "'";
+    public void delete(@NotNull String table, @NotNull String key, @NotNull String value) throws SQLException {
+        String statement = "DELETE FROM '" + table + "' WHERE '" + key + "'='" + value + "'";
         new Statement(statement, connection).execute();
     }
 
@@ -234,8 +211,24 @@ public class Database {
      * @param value The value
      * @return whether that row exists
      */
-    public boolean rowExists(String table, String key, String value) throws SQLException {
-        String statement = "SELECT * FROM " + table + " WHERE " + key + "='" + value + "'";
+    public boolean rowExists(@NotNull String table, @NotNull String key, @NotNull String value) throws SQLException {
+        String statement = "SELECT * FROM '" + table + "' WHERE '" + key + "'='" + value + "'";
         return new Statement(statement, connection).executeWithResults().next();
     }
+
+    /**
+     * Replace a current row with a new one
+     * @param table The table in which the row is located
+     * @param key The key you would like to check
+     * @param value the value of that key
+     * @param values the values of the new row you'd like to insert
+     * @throws SQLException If there's an error communicating with the database
+     */
+    public void replace(@NotNull String table, @NotNull String key, @NotNull String value, @NotNull HashMap<String, String> values) throws SQLException {
+        if (!rowExists(table, key, value)) return; // Trying to prevent as many errors as possible :/
+
+        delete(table, key, value);
+        insert(table, values);
+    }
 }
+
