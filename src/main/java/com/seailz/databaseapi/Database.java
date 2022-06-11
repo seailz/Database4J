@@ -163,9 +163,9 @@ public class Database {
         String lastKey = keysArray.get(keysArray.size() - 1);
         for (String key : values.keySet()) {
             if (!key.equals(lastKey))
-                statement.append("'").append(key).append("', ");
+                statement.append(key).append(", ");
             else
-                statement.append("'").append(key).append(")");
+                statement.append(key).append(")");
         }
 
         statement.append(" values (");
