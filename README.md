@@ -13,7 +13,7 @@
 	<groupId>com.github.seailz</groupId>
 	<artifactId>databaseapi</artifactId>
 	<version>1.1</version>
-	<scope>compile</compile>
+	<scope>compile</scope>
 </dependency>
 ```
 
