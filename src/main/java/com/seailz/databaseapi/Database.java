@@ -158,7 +158,7 @@ public class Database {
      */
     public void insert(@NotNull String table, @NotNull HashMap<String, String> values) throws SQLException {
         debug = true;
-        StringBuilder statement = new StringBuilder("insert into `" + table + "` (");
+        StringBuilder statement = new StringBuilder("insert into " + table + " (");
 
         ArrayList<String> keysArray = new ArrayList<>(values.keySet());
         String lastKey = keysArray.get(keysArray.size() - 1);
