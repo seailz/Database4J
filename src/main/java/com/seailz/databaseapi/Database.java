@@ -157,15 +157,16 @@ public class Database {
      * @throws SQLException if there is an error
      */
     public void insert(@NotNull String table, @NotNull HashMap<String, String> values) throws SQLException {
+        debug = true;
         StringBuilder statement = new StringBuilder("insert into " + table + " (");
 
         ArrayList<String> keysArray = new ArrayList<>(values.keySet());
         String lastKey = keysArray.get(keysArray.size() - 1);
         for (String key : values.keySet()) {
             if (!key.equals(lastKey))
-                statement.append(key).append(", ");
+                statement.append("`").append(key).append("`, ");
             else
-                statement.append(key).append(")");
+                statement.append("`").append(key).append("`)");
         }
 
         statement.append(" values (");
