@@ -70,8 +70,8 @@ public class Database {
      * @author Seailz
      */
     public void createTable(@NotNull Table table) throws SQLException {
-        debug = false;
-        StringBuilder statement = new StringBuilder("CREATE TABLE " + table.getName() + " (\n");
+        debug = true;
+        StringBuilder statement = new StringBuilder("CREATE TABLE `" + table.getName() + "` (\n");
 
         Column last = table.getColumns().get(table.getColumns().size() - 1);
         Column first = table.getColumns().stream().findFirst().get();
@@ -80,9 +80,9 @@ public class Database {
             String name = column.getName();
 
             if (first == column)
-                statement.append("\t").append(name).append(" ").append(type);
+                statement.append("\t`").append(name).append("` ").append(type);
             else
-                statement.append("\n\t").append(name).append(" ").append(type);
+                statement.append("\n\t`").append(name).append("` ").append(type);
 
 
             statement.append("(").append(column.getLength()).append(")");
