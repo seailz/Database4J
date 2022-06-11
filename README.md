@@ -12,7 +12,7 @@
 <dependency>
 	<groupId>com.github.seailz</groupId>
 	<artifactId>databaseapi</artifactId>
-	<version>1.1</version>
+	<version>1.2.2</version>
 	<scope>compile</scope>
 </dependency>
 ```
