@@ -71,7 +71,7 @@ public class Database {
      */
     public void createTable(@NotNull Table table) throws SQLException {
         debug = false;
-        StringBuilder statement = new StringBuilder("CREATE TABLE `" + table.getName() + "` (\n");
+        StringBuilder statement = new StringBuilder("CREATE TABLE " + table.getName() + " (\n");
 
         Column last = table.getColumns().get(table.getColumns().size() - 1);
         Column first = table.getColumns().stream().findFirst().get();
@@ -80,9 +80,9 @@ public class Database {
             String name = column.getName();
 
             if (first == column)
-                statement.append("\t`").append(name).append("` ").append(type);
+                statement.append("\t").append(name).append(" ").append(type);
             else
-                statement.append("\n\t`").append(name).append("` ").append(type);
+                statement.append("\n\t").append(name).append(" ").append(type);
 
 
             statement.append("(").append(column.getLength()).append(")");
@@ -97,7 +97,7 @@ public class Database {
         }
 
         if (table.getPrimaryKey() != null)
-            statement.append(",\n\tPRIMARY KEY (`").append(table.getPrimaryKey()).append("`)");
+            statement.append(",\n\tPRIMARY KEY (").append(table.getPrimaryKey()).append(")");
 
         statement.append("\n);");
 
@@ -157,7 +157,7 @@ public class Database {
      * @throws SQLException if there is an error
      */
     public void insert(@NotNull String table, @NotNull HashMap<String, String> values) throws SQLException {
-        StringBuilder statement = new StringBuilder("insert into '" + table + "' (");
+        StringBuilder statement = new StringBuilder("insert into " + table + " (");
 
         ArrayList<String> keysArray = new ArrayList<>(values.keySet());
         String lastKey = keysArray.get(keysArray.size() - 1);
