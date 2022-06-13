@@ -12,7 +12,7 @@
 <dependency>
 	<groupId>com.github.seailz</groupId>
 	<artifactId>databaseapi</artifactId>
-	<version>894a44295875c86ef8c8c40692c222729e721c0e</version>
+	<version>46c3d69fed8a158a03b2e3ae1665feb4004dea28</version>
 	<scope>compile</scope>
 </dependency>
 ```
