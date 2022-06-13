@@ -20,9 +20,7 @@
 # Documentation
 
 ## Getting Started
-First, we need to create our Database instance. There are two ways to do this:
-The first way, is add all your values like this:
-
+First, we need to create our Database instance:
 ```java
 Database db = new Database(
                 "INSERT IP",
@@ -32,12 +30,6 @@ Database db = new Database(
                 "INSERT DATABASE NAME");
 ```
 The code will automatically make a JDBC connection URL for you.
-
-Alternatively, you could use a JDBC connection URL you already have generated like this:
-```java
-Database db = new Database("INSERT JDBC URL HERE");
-```
-
 Finally, we need to initiate the connection, like this:
 ```java
 db.connect(); 
@@ -50,12 +42,30 @@ First, we need to choose what our columns should be. To do that, you need to mak
 
 ```java
 List<Column> columns = new ArrayList<>();
-        columns.add(
-                new Column(
-                        CollumType.VARCHAR, "Test Column"
-                )
-        );
+        
+        Column column = new Column(ColumnType.VARCHAR, "Test Column");
+
+        columns.add(column);
 ```
+
+<details>
+<summary> Custom Lengths </summary>
+
+By default the column's length is set to 255, but your able to change that like this:
+```java
+column.setLength(INSERT_LENGTH_HERE);
+```
+</details>
+<details>
+<summary> Disallow Null </summary>
+
+If you want to deny null in your column, all you need to do is this:
+```java
+column.setAllowNull(false); // (by default this is set to true)
+```
+
+</details>
+
 Of course you can add more if you like.
 The current supported types are:
 ```java
@@ -90,6 +100,24 @@ db.createTable(table);
 ```
 
 There you go! You should now have a table inside of your database.
+
+## Transactions (PLEASE READ)
+Before we move on I want to leave an important note. Transactions are an essential part of working on a database and makes sure you don't make any errors. Here's how to use them:
+
+Starting a transaction:
+```java
+db.startTransaction();
+```
+
+Committing a transaction:
+```java
+ db.commit();
+```
+
+Rolling back a transaction:
+```java
+db.rollback();
+```
 
 ## Reading from the database
 To read from a database, it's reasonably simple.
@@ -142,8 +170,43 @@ Again, pretty easy:
 db.rowExists("INSERT_TABLE_HERE", "INSERT_KEY_HERE", "INSERT_VALUE_HERE");
 ```
 
+## Sending your own commands
+Do you want to send you own MySQL commands to your database easily? Well read on :)
+
+There's a custom class called "Statement" which can be used to easily send statements to your server. All you need to do is this:
+
+```java
+Statement s = new Statement("INSERT_MYSQL_COMMAND_HERE", db.getConnection();
+```
+
+Now to execute the command, you have two options:
+
+<details>
+<summary> With Results Set </summary>
+This should be used if the command is supposed to return some results. Here's his:
+
+```java
+ResultsSet r = s.executeWithResults();
+```
+</details>
+<details>
+<summary> Without Results Set </summary>
+This should be used when the command is not expected to return results. For example, creating a new table.
+
+```java
+s.execute();
+```
+
+</details>
+
 ## Disconnecting
 Once your done interacting with your database, be sure to disconnect like this:
 ```java
 db.disconnect();
 ```
+
+Other than that there are a bunch of other weird and wonderful things added to the database class, so make sure to check it out! It has about every single MySQL command I could find! (thanks copilot). Here's a few highlights
+
+- Exporting and importing from a CSV file
+- Counting the amount of rows in a table
+- Altering columns
