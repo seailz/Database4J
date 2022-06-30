@@ -1,24 +1,61 @@
+/*
+ * MIT License
+ *
+ * Copyright (c) 2022 Negative
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ *
+ */
+
 package com.seailz.databaseapi;
 
-import com.seailz.databaseapi.core.table.Column;
-import com.seailz.databaseapi.core.table.ColumnType;
-import com.seailz.databaseapi.core.table.Table;
-import com.seailz.databaseapi.core.Statement;
+import com.seailz.databaseapi.annotation.DontSave;
+import com.seailz.databaseapi.annotation.builder.InsertBuilder;
+import com.seailz.databaseapi.annotation.builder.LoginBuilder;
+import com.seailz.databaseapi.annotation.builder.TableBuilder;
+import com.seailz.databaseapi.annotation.builder.general.WhereBuilder;
+import com.seailz.databaseapi.annotation.constructor.DatabaseConstructor;
 import lombok.Getter;
 import lombok.Setter;
+import lombok.SneakyThrows;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
+import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Parameter;
 import java.sql.*;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.logging.Level;
 
 /**
  * <p>A way to interact with databases easier than JDBC.</p>
  * <p></p>
  * <p>I won't leave a full documentation here, but if you want to read</p>
- * <p>how to use this in more detail, you can find it <a href="https://github.com/Negative-Games/Framework/pull/108#issue-1265327573">here</a> </p>
+ * <p>how to use this in more detail, you can find it <a href="https://github.com/Negative-Games/Framework/wiki/">here</a> </p>
  * <p></p>
  * <p>{@code Creating a Database Instance}</p>
  * <p>To create a database instance, you have to do this:</p>
@@ -29,10 +66,10 @@ import java.util.HashMap;
  *
  * <p>This will connect to the database for you.</p>
  * <p></p>
- * <p>{@code Creating a Table}</p>
+ * <p>{@code Creating a TableBuilder}</p>
  * <p>To create a table, you have to do this:</p>
  * <pre>
- *     Table table = new Table("tableName");
+ *     TableBuilder table = new TableBuilder("tableName");
  *     table.addColumn(new Column("columnName", ColumnType.EXAMPLE_TYPE));
  *     db.createTable(table);
  * </pre>
@@ -51,8 +88,14 @@ import java.util.HashMap;
  *     db.disconnect();
  * </pre>
  * <p></p>
- * <p>Again, a more detailed documentation can be found here <a href="https://github.com/Negative-Games/Framework/pull/108#issue-1265327573">here</a> </p>
- * @author Seailz - <a href="https://www.seailz.com">Website</a>
+ * <p>{@code Inserting Java Objects}</p>
+ * <p>To insert Java objects into a table, you have to do this:</p>
+ * <pre>
+ *     db.writeObjectToTable("tableName", new Object());
+ * </pre>
+ * <p>Again, a more detailed documentation can be found <a href="https://github.com/Negative-Games/Framework/wiki/">here</a> </p>
+ *
+ * @author Seailz
  */
 @Getter
 @Setter
@@ -66,39 +109,48 @@ public class Database {
     private String username;
     private String password;
     private String databaseName;
+    private File sqlLiteFile;
 
     private Connection connection;
 
     /**
-     * Create a database instance
-     * @param ip The ip which you would like to connect to
-     * @param port The port on which the database is hosted
-     * @param username The username you'd like to use
-     * @param password The password you'd like to use.
+     * Create a database instance with MySQL
+     *
+     * @param ip           The ip which you would like to connect to
+     * @param port         The port on which the database is hosted
+     * @param username     The username you'd like to use
+     * @param password     The password you'd like to use.
      * @param databaseName The name of the database
-     * @author Seailz
      */
-    public Database(@NotNull String ip, int port, @NotNull String username, @NotNull String password, @NotNull String databaseName) throws ClassNotFoundException {
+    @SneakyThrows
+    public Database(@NotNull String ip, int port, @NotNull String username, @NotNull String password, @NotNull String databaseName) {
+        this(ip, port, username, password, databaseName, false);
         Class.forName("com.mysql.cj.jdbc.Driver");
-        setIp(ip);
-        setPort(port);
-        setUsername(username);
-        setPassword(password);
-        setDatabaseName(databaseName);
     }
 
     /**
-     * Create a database instance
-     * @param ip The ip which you would like to connect to
-     * @param port The port on which the database is hosted
-     * @param username The username you'd like to use
-     * @param password The password you'd like to use.
-     * @param databaseName The name of the database
-     * @param debug Whether you'd like to debug the database
-     * @author Seailz
+     * Create a database instance using {@link LoginBuilder} with MySQL
+     *
+     * @param loginBuilder The {@link LoginBuilder} you'd like to use
      */
-    public Database(@NotNull String ip, int port, @NotNull String username, @NotNull String password, @NotNull String databaseName, boolean debug) throws ClassNotFoundException {
+    @SneakyThrows
+    public Database(@NotNull LoginBuilder loginBuilder) {
+        this(loginBuilder.getIp(), loginBuilder.getPort(), loginBuilder.getUsername(), loginBuilder.getPassword(), loginBuilder.getDatabase());
         Class.forName("com.mysql.cj.jdbc.Driver");
+    }
+
+    /**
+     * Create a database instance with MySQL
+     *
+     * @param ip           The ip which you would like to connect to
+     * @param port         The port on which the database is hosted
+     * @param username     The username you'd like to use
+     * @param password     The password you'd like to use.
+     * @param databaseName The name of the database
+     * @param debug        Whether you'd like to debug the database
+     */
+    @SneakyThrows
+    public Database(@NotNull String ip, int port, @NotNull String username, @NotNull String password, @NotNull String databaseName, boolean debug) {
         setIp(ip);
         setPort(port);
         setUsername(username);
@@ -106,15 +158,32 @@ public class Database {
         setDatabaseName(databaseName);
         setDebug(debug);
 
+        Class.forName("com.mysql.cj.jdbc.Driver");
+
         if (debug)
-            System.out.println("[Database] Debugging enabled");
+            log("Debugging enabled");
+    }
+
+    /**
+     * Creates a database instance with SQLite
+     *
+     * @param file The file which you would like to use
+     */
+    public Database(File file) {
+        setSqlLiteFile(file);
     }
 
     /**
      * Initiate the connection to the database
-     * @author Seailz
      */
-    public void connect() throws SQLException {
+    @SneakyThrows
+    public void connect() {
+        if (getSqlLiteFile() != null) {
+            Class.forName("org.sqlite.JDBC");
+            connection = DriverManager.getConnection("jdbc:sqlite:" + getSqlLiteFile().getAbsolutePath());
+            return;
+        }
+
         connection = DriverManager.getConnection(
                 "jdbc:mysql://" + getIp() + ":" + getPort() + "/" + getDatabaseName(),
                 getUsername(),
@@ -122,33 +191,33 @@ public class Database {
         );
 
         if (debug)
-            System.out.println("[Database] Connected to database");
+            log("Connected to database");
     }
 
     /**
      * Disconnect from the database
-     * @throws SQLException If the connection is already closed
-     * @author Seailz
      */
-    public void disconnect() throws SQLException {
+    @SneakyThrows
+    public void disconnect() {
         connection.close();
         if (debug)
-            System.out.println("[Database] Disconnected from database");
+            log("Disconnected from database");
     }
 
     /**
      * Creates a table within the Database
+     *
      * @param table The table you would like to create
      * @throws IllegalStateException If the arraylist is empty
-     * @author Seailz
      */
-    public void createTable(@NotNull Table table) throws SQLException, IllegalStateException {
+    public void createTable(@NotNull TableBuilder table) throws SQLException, IllegalStateException {
         StringBuilder statement = new StringBuilder("CREATE TABLE `" + table.getName() + "` (\n");
 
+        if (table.getColumns().isEmpty())
+            throw new IllegalStateException("There are no columns for table " + table.getName() + ".");
+
+        Column first = table.getColumns().get(0);
         Column last = table.getColumns().get(table.getColumns().size() - 1);
-        if (!table.getColumns().stream().findFirst().isPresent())
-            throw new IllegalStateException("Empty ArrayList");
-        Column first = table.getColumns().stream().findFirst().get();
         for (Column column : table.getColumns()) {
             String type = column.getType().toString();
             String name = column.getName();
@@ -176,16 +245,26 @@ public class Database {
         statement.append("\n);");
 
         if (debug)
-            System.out.println("[Database] Creating table: " + statement.toString());
+            log("Creating table " + table.getName() + ": " + statement.toString());
 
         new Statement(statement.toString(), connection).execute();
+
+        table.getColumns().forEach(column -> {
+            if (column.getDefaultValue() != null) {
+                try {
+                    setColumnDefaultValue(table.getName(), column.getName(), column.getDefaultValue());
+                } catch (SQLException e) {
+                    e.printStackTrace();
+                }
+            }
+        });
     }
 
     /**
      * Start a transaction
-     * @throws SQLException if there is an error with the connection
+     *
+     * @throws SQLException          if there is an error with the connection
      * @throws IllegalStateException if the connection is already in a transaction
-     * @author Seailz
      */
     public void startTransaction() throws SQLException, IllegalStateException {
         if (isInTransaction())
@@ -195,14 +274,14 @@ public class Database {
         new Statement("START TRANSACTION", connection).execute();
 
         if (debug)
-            System.out.println("[Database] Started transaction");
+            log("Started transaction");
     }
 
     /**
      * Rollback a transaction
-     * @throws SQLException if there is an error with the connection
+     *
+     * @throws SQLException          if there is an error with the connection
      * @throws IllegalStateException if the connection is not in a transaction
-     * @author Seailz
      */
     public void rollback() throws SQLException, IllegalStateException {
         if (!isInTransaction())
@@ -210,14 +289,14 @@ public class Database {
         new Statement("ROLLBACK", connection).execute();
 
         if (debug)
-            System.out.println("[Database] Rolled back transaction");
+            log("Rolled back transaction");
     }
 
     /**
      * Commit a transaction
-     * @throws SQLException if there is an error with the connection
+     *
+     * @throws SQLException          if there is an error with the connection
      * @throws IllegalStateException if there is no transaction to commit
-     * @author Seailz
      */
     public void commit() throws SQLException, IllegalStateException {
         if (!isInTransaction())
@@ -227,7 +306,7 @@ public class Database {
         connection.setAutoCommit(true);
 
         if (debug)
-            System.out.println("[Database] Committed transaction");
+            log("Committed transaction");
     }
 
     /**
@@ -242,62 +321,65 @@ public class Database {
      * <p>I'd set the column parameter to "age"</p>
      * <p>
      *
-     * @param table the table you'd like to pull from
-     * @param key The key you'd like to check
-     * @param value The value that you'd like to check
+     * @param table  the table you'd like to pull from
+     * @param key    The key you'd like to check
+     * @param value  The value that you'd like to check
      * @param column The column you'd like to get
      * @return An object
      * @throws SQLException if there is an error retrieving the request value
-     * @author Seailz
      */
+    @Nullable
     public Object get(@NotNull String table, @NotNull String key, @NotNull String value, @NotNull String column) throws SQLException {
-        String statement = "SELECT * FROM '" + table + "'";
+        String statement = "SELECT * FROM `" + table + "`";
         ResultSet set = new Statement(statement, connection).executeWithResults();
+
+        if (debug)
+            log("Getting " + column + " from " + table + " where " + key + " = " + value);
 
         while (set.next()) {
             if (set.getObject(key).equals(value))
                 return set.getObject(column);
         }
         if (debug)
-            System.out.println("[Database] Getting value: " + statement);
+            log("Getting value from table " + table + " failed");
         return null;
     }
 
     /**
      * Check if a table exists
+     *
      * @param tableName The table you'd like to check
      * @return A boolean if the table exists or not
      * @throws SQLException If there is an error
-     * @author Seailz
      */
     public boolean tableExists(@NotNull String tableName) throws SQLException {
         DatabaseMetaData meta = connection.getMetaData();
-        ResultSet resultSet = meta.getTables(null, null, tableName, new String[] {"TABLE"});
+        ResultSet resultSet = meta.getTables(null, null, tableName, new String[]{"TABLE"});
         if (debug)
-            System.out.println("[Database] Checking if table exists: " + tableName);
+            log("Checking if table exists: " + tableName);
         return resultSet.next();
     }
 
     /**
      * Insert into a database
-     * @param table The table you'd like to insert to
+     *
+     * @param table  The table you'd like to insert to
      * @param values A hashmap of keys, and values
      * @throws SQLException if there is an error
-     * @author Seailz
      */
     public void insert(@NotNull String table, @NotNull HashMap<String, String> values) throws SQLException {
-        StringBuilder statement = new StringBuilder("insert into '" + table + "' (");
+        StringBuilder statement = new StringBuilder("insert into `" + table + "` (\n\t");
 
         ArrayList<String> keysArray = new ArrayList<>(values.keySet());
         String lastKey = keysArray.get(keysArray.size() - 1);
         for (String key : values.keySet()) {
             if (!key.equals(lastKey))
-                statement.append("'").append(key).append("', ");
+                statement.append(key).append(",");
             else
-                statement.append("'").append(key).append(")");
+                statement.append(key).append("\n)\n\t");
         }
 
-        statement.append(" values (");
+        statement.append(" values (\n\t");
 
         ArrayList<String> valuesArray = new ArrayList<>(values.values());
         String lastValue = valuesArray.get(valuesArray.size() - 1);
@@ -305,11 +387,11 @@ public class Database {
             if (!value.equals(lastValue))
                 statement.append("?, ");
             else
-                statement.append("?)");
+                statement.append("?\n);");
         }
 
         if (debug)
-            System.out.println(statement);
+            log(String.valueOf(statement));
 
         PreparedStatement prepStatement = connection.prepareStatement(statement.toString());
         int i = 0;
@@ -320,159 +402,236 @@ public class Database {
         }
 
         if (debug)
-            System.out.println("[Database] Inserting into table: " + statement.toString());
-        prepStatement.execute();
+            log("Inserting into table: " + table + " with values: " + values);
+        prepStatement.executeUpdate();
+    }
+
+    /**
+     * Insert into a database
+     *
+     * @param builder The builder you'd like to use
+     * @throws SQLException if there is an error
+     */
+    public void insert(@NotNull InsertBuilder builder) throws SQLException {
+        StringBuilder statement = new StringBuilder("insert into `" + builder.getTable() + "` (\n\t");
+
+        ArrayList<String> keysArray = new ArrayList<>(builder.getValues().keySet());
+        String lastKey = keysArray.get(keysArray.size() - 1);
+        for (String key : builder.getValues().keySet()) {
+            if (!key.equals(lastKey))
+                statement.append(key).append(",");
+            else
+                statement.append(key).append("\n)\n\t");
+        }
+
+        statement.append(" values (\n\t");
+
+        ArrayList<String> valuesArray = new ArrayList<>(builder.getValues().values());
+        String lastValue = valuesArray.get(valuesArray.size() - 1);
+        for (String value : builder.getValues().values()) {
+            if (!value.equals(lastValue))
+                statement.append("?, ");
+            else
+                statement.append("?\n);");
+        }
+
+        if (debug)
+            log(String.valueOf(statement));
+
+        PreparedStatement prepStatement = connection.prepareStatement(statement.toString());
+        int i = 0;
+
+        for (String value : builder.getValues().values()) {
+            i++;
+            prepStatement.setObject(i, value);
+        }
+
+        if (debug)
+            log("Inserting into table: " + builder.getTable() + " with values: " + builder.getValues());
+        prepStatement.executeUpdate();
     }
 
     /**
      * Delete a row rom the database
+     *
      * @param table The table you'd like to edit
-     * @param key The key, basically the identifier
+     * @param key   The key, basically the identifier
      * @param value The value, such as the player's name
-     * @author Seailz
      */
     public void delete(@NotNull String table, @NotNull String key, @NotNull String value) throws SQLException {
         String statement = "DELETE FROM '" + table + "' WHERE '" + key + "'='" + value + "'";
         new Statement(statement, connection).execute();
         if (debug)
-            System.out.println("[Database] Deleting from table: " + statement);
+            log("Deleting from table: " + table + " with key: " + key + " and value: " + value);
     }
 
     /**
      * Check if a row exists
+     *
      * @param table The table you'd like to check
-     * @param key The key
+     * @param key   The key
      * @param value The value
      * @return whether that row exists
      * @throws SQLException if there is an error connecting to the database
-     * @author Seailz
      */
     public boolean rowExists(@NotNull String table, @NotNull String key, @NotNull String value) throws SQLException {
         String statement = "SELECT * FROM `" + table + "` WHERE '" + key + "'='" + value + "'";
         if (debug)
-            System.out.println("[Database] Checking if row exists: " + statement);
+            log("Checking if row exists: " + statement);
+        return new Statement(statement, connection).executeWithResults().next();
+    }
+
+    /**
+     * Check if a row exists
+     *
+     * @param table   The table you'd like to check
+     * @param builder The builder you'd like to use
+     * @return whether that row exists
+     * @throws SQLException if there is an error connecting to the database
+     */
+    public boolean rowExists(@NotNull String table, @NotNull WhereBuilder builder) throws SQLException {
+        String statement = "SELECT * FROM `" + table + "` WHERE '" + builder.getKey() + "'='" + builder.getValue() + "'";
+        if (debug)
+            log("Checking if row exists: " + statement);
         return new Statement(statement, connection).executeWithResults().next();
     }
 
     /**
      * Replace a current row with a new one
-     * @param table The table in which the row is located
-     * @param key The key you would like to check
-     * @param value the value of that key
+     *
+     * @param table  The table in which the row is located
+     * @param key    The key you would like to check
+     * @param value  the value of that key
      * @param values the values of the new row you'd like to insert
      * @throws SQLException If there's an error communicating with the database
-     * @author Seailz
      */
     public void replace(@NotNull String table, @NotNull String key, @NotNull String value, @NotNull HashMap<String, String> values) throws SQLException {
-        if (!rowExists(table, key, value)) return; // Trying to prevent as many errors as possible :/
+        if (!rowExists(table, key, value)) return;
 
         if (debug)
-            System.out.println("[Database] Replacing row: " + table + "." + key + "=" + value);
+            log("Replacing row in table: " + table + " with key: " + key + " and value: " + value);
 
         delete(table, key, value);
         insert(table, values);
     }
 
     /**
+     * Replace a current row with a new one
+     *
+     * @param table        The table in which the row is located
+     * @param whereBuilder The where builder you'd like to use
+     * @param values       the values of the new row you'd like to insert
+     * @throws SQLException If there's an error communicating with the database
+     */
+    public void replace(@NotNull String table, @NotNull WhereBuilder whereBuilder, @NotNull HashMap<String, String> values) throws SQLException {
+        if (!rowExists(table, whereBuilder.getKey(), whereBuilder.getValue())) return;
+
+        if (debug)
+            log("Replacing row in table: " + table + " with key: " + whereBuilder.getKey() + " and value: " + whereBuilder.getValue());
+
+        delete(table, whereBuilder.getKey(), whereBuilder.getValue());
+        insert(table, values);
+    }
+
+    /**
      * Delete a table
+     *
      * @param name The name of the table you'd like to delete
      * @throws SQLException if there is an error communicating with the database
-     * @author Seailz
      */
     public void deleteTable(@NotNull String name) throws SQLException {
         if (!tableExists(name)) return;
         if (debug)
-            System.out.println("[Database] Deleting table: " + name);
+            log("Deleteing table: " + name);
         new Statement("DROP TABLE " + name + ";", connection).execute();
     }
 
     /**
      * Update a row in a table
-     * @param table The table you'd like to update
-     * @param key The key you'd like to check
-     * @param value The value you'd like to check
-     * @param column The column you'd like to update
-     * @param newColumn The new value you'd like to insert
+     *
+     * @param table        The table you'd like to update
+     * @param whereBuilder The where builder you'd like to use
+     * @param column       The column you'd like to update
+     * @param newColumn    The new value you'd like to insert
      * @throws SQLException if there is an error communicating with the database
-     * @author Seailz
      */
-    public void update(@NotNull String table, @NotNull String key, @NotNull String value, @NotNull String column, @NotNull String newColumn) throws SQLException {
-        String statement = "UPDATE `" + table + "` SET `" + column + "`=`" + newColumn + "` WHERE `" + key + "`='" + value + "'";
+    public void update(@NotNull String table, @NotNull WhereBuilder whereBuilder, @NotNull String column, @NotNull String newColumn) throws SQLException {
+        String statement = "UPDATE `" + table + "` SET `" + column + "`=`" + newColumn + "` WHERE `" + whereBuilder.getKey() + "`='" + whereBuilder.getValue() + "'";
         if (debug)
-            System.out.println("[Database] Updating row: " + statement);
+            log("Updating row with table: " + table + " with key: " + whereBuilder.getKey() + " and value: " + whereBuilder.getValue() + " with column: " + column + " and new value: " + newColumn);
         new Statement(statement, connection).execute();
     }
 
 
     /**
      * Update a table in the database
-     * @param table The table you'd like to update
+     *
+     * @param table  The table you'd like to update
      * @param column The column you'd like to update
-     * @param type The type of the column
+     * @param type   The type of the column
      * @throws SQLException if there is an error communicating with the database
-     * @author Seailz
      */
     public void addColumnToTable(String table, String column, String type) throws SQLException {
         String statement = "ALTER TABLE `" + table + "` ADD `" + column + "` " + type + ";";
         if (debug)
-            System.out.println("[Database] Altering table: " + statement);
+            log("Adding column to table: " + table + " with name: " + column + " and type: " + type);
         new Statement(statement, connection).execute();
     }
 
     /**
      * Remove a column from a table
-     * @param table The table you'd like to remove a column from
+     *
+     * @param table  The table you'd like to remove a column from
      * @param column The column you'd like to remove
      * @throws SQLException if there is an error communicating with the database
-     * @author Seailz
      */
     public void removeColumnFromTable(String table, String column) throws SQLException {
         String statement = "ALTER TABLE `" + table + "` DROP COLUMN `" + column + "`;";
         if (debug)
-            System.out.println("[Database] Altering table: " + statement);
+            log("Removing column: " + column + " from table: " + table);
         new Statement(statement, connection).execute();
     }
 
     /**
      * Change a column's name
-     * @param table The table you'd like to change a column's name in
+     *
+     * @param table   The table you'd like to change a column's name in
      * @param oldName The old name of the column
      * @param newName The new name of the column
      * @throws SQLException if there is an error communicating with the database
-     * @author Seailz
      */
     public void changeColumnName(String table, String oldName, String newName) throws SQLException {
         String statement = "ALTER TABLE `" + table + "` CHANGE `" + oldName + "` `" + newName + "`;";
         if (debug)
-            System.out.println("[Database] Altering table: " + statement);
+            log("Changing column name: " + oldName + " to " + newName + " in table: " + table);
         new Statement(statement, connection).execute();
     }
 
     /**
      * Delete a column from a table
-     * @param table The table you'd like to delete a column from
+     *
+     * @param table  The table you'd like to delete a column from
      * @param column The column you'd like to delete
      * @throws SQLException if there is an error communicating with the database
-     * @author Seailz
      */
     public void deleteColumnFromTable(String table, String column) throws SQLException {
         String statement = "ALTER TABLE `" + table + "` DROP COLUMN `" + column + "`;";
         if (debug)
-            System.out.println("[Database] Altering table: " + statement);
+            log("Deleteing column: " + column + " from table: " + table);
         new Statement(statement, connection).execute();
     }
 
     /**
      * Export a table to a file
-     * @param table The table you'd like to export
+     *
+     * @param table    The table you'd like to export
      * @param filePath The file's path you'd like to export to
      * @throws SQLException if there is an error communicating with the database
-     * @author Seailz
      */
     public void exportToCSV(String table, String filePath) throws SQLException {
         String statement = "SELECT * FROM `" + table + "`";
         if (debug)
-            System.out.println("[Database] Exporting table: " + statement);
+            log("Exporting table: " + table + " to file: " + filePath);
         ResultSet resultSet = new Statement(statement, connection).executeWithResults();
         try {
             FileWriter writer = new FileWriter(filePath);
@@ -492,29 +651,29 @@ public class Database {
 
     /**
      * Import a table from a file
-     * @param table The table you'd like to import into
+     *
+     * @param table    The table you'd like to import into
      * @param filePath The file's path you'd like to import from
      * @throws SQLException if there is an error communicating with the database
-     * @author Seailz
      */
     public void importFromFile(String table, String filePath) throws SQLException {
         String statement = "LOAD DATA INFILE '" + filePath + "' INTO TABLE `" + table + "`";
         if (debug)
-            System.out.println("[Database] Importing table: " + statement);
+            log("Importing table: " + table + " from file: " + filePath);
         new Statement(statement, connection).execute();
     }
 
     /**
      * Count the number of rows in a table
+     *
      * @param table The table you'd like to count
      * @return The number of rows in the table
      * @throws SQLException if there is an error communicating with the database
-     * @author Seailz
      */
     public int countRows(String table) throws SQLException {
         String statement = "SELECT COUNT(*) FROM `" + table + "`";
         if (debug)
-            System.out.println("[Database] Counting rows: " + statement);
+            log("Counting rows in table: " + table);
         ResultSet resultSet = new Statement(statement, connection).executeWithResults();
         resultSet.next();
         return resultSet.getInt(1);
@@ -522,98 +681,262 @@ public class Database {
 
     /**
      * Get all tables in the database
+     *
      * @return A list of all tables in the database
      * @throws SQLException if there is an error communicating with the database
-     * @author Seailz
      */
     public ResultSet getAllTables() throws SQLException {
         String statement = "SHOW TABLES";
         if (debug)
-            System.out.println("[Database] Getting all tables: " + statement);
+            log("Getting all tables");
         return new Statement(statement, connection).executeWithResults();
     }
 
     /**
      * Get all data in a table
+     *
      * @param table The table you'd like to get data from
      * @return A list of all data in the table
      * @throws SQLException if there is an error communicating with the database
-     * @author Seailz
      */
     public ResultSet getAllDataInTable(String table) throws SQLException {
         String statement = "SELECT * FROM `" + table + "`";
         if (debug)
-            System.out.println("[Database] Getting all data in table: " + statement);
+            log("Getting all data in table: " + table);
         return new Statement(statement, connection).executeWithResults();
     }
 
     /**
      * Delete a table if it exists
+     *
      * @param table The table you'd like to delete
      * @throws SQLException if there is an error communicating with the database
-     * @author Seailz
      */
     public void deleteTableIfExists(String table) throws SQLException {
         String statement = "DROP TABLE IF EXISTS `" + table + "`";
         if (debug)
-            System.out.println("[Database] Deleting table: " + statement);
+            log("Deleting table if it exists: " + table);
         new Statement(statement, connection).execute();
     }
 
     /**
      * Replace the primary key of a table
-     * @param table The table you'd like to replace the primary key in
+     *
+     * @param table      The table you'd like to replace the primary key in
      * @param primaryKey The new primary key
-     * @throws SQLException if there is an error communicating with the database
-     * @author Seailz
      */
-    public void replacePrimaryKey(String table, String primaryKey) throws SQLException {
+    public void replacePrimaryKey(String table, String primaryKey) {
         String statement = "ALTER TABLE `" + table + "` DROP PRIMARY KEY, ADD PRIMARY KEY (`" + primaryKey + "`);";
         if (debug)
-            System.out.println("[Database] Altering table: " + statement);
+            log("Changing primary key of table: " + table + " to: " + primaryKey);
         new Statement(statement, connection).execute();
     }
 
     /**
      * Copies the contents of one table to another
-     * @param table The table you'd like to copy to
+     *
+     * @param table    The table you'd like to copy to
      * @param copyFrom The table you'd like to copy from
      * @throws SQLException if there is an error communicating with the database
-     * @author Seailz
      */
     public void copyContentsToNewTable(String table, String copyFrom) throws SQLException {
         String statement = "INSERT INTO `" + table + "` SELECT * FROM `" + copyFrom + "`;";
         if (debug)
-            System.out.println("[Database] Altering table: " + statement);
+            log("Copying contents from table: " + copyFrom + " to table: " + table);
         new Statement(statement, connection).execute();
     }
 
     /**
      * Describe a table
+     *
      * @param table The table you'd like to describe
      * @return The description of the table
      * @throws SQLException if there is an error communicating with the database
-     * @author Seailz
      */
     public ResultSet describeTable(String table) throws SQLException {
         String statement = "DESCRIBE `" + table + "`";
         if (debug)
-            System.out.println("[Database] Describing table: " + statement);
+            log("Describing table: " + table);
         return new Statement(statement, connection).executeWithResults();
     }
 
     /**
      * Describe a column in a table
-     * @param table The table you'd like to describe
+     *
+     * @param table  The table you'd like to describe
      * @param column The column you'd like to describe
      * @return The description of the column
      * @throws SQLException if there is an error communicating with the database
-     * @author Seailz
      */
     public ResultSet describeColumn(String table, String column) throws SQLException {
         String statement = "DESCRIBE `" + table + "` `" + column + "`";
         if (debug)
-            System.out.println("[Database] Describing column: " + statement);
+            log("Describing column: " + column + " in table: " + table);
         return new Statement(statement, connection).executeWithResults();
     }
+
+    /**
+     * Set a column's default value
+     *
+     * @param table  The table you'd like to set the default value in
+     * @param column The column you'd like to set the default value for
+     * @param value  The default value you'd like to set
+     * @throws SQLException if there is an error communicating with the database
+     */
+    public void setColumnDefaultValue(String table, String column, String value) throws SQLException {
+        String statement = "ALTER TABLE `" + table + "` ALTER `" + column + "` SET DEFAULT " + value + ";";
+        if (debug)
+            log("Setting default value: " + value + " for column: " + column + " in table: " + table);
+        new Statement(statement, connection).execute();
+    }
+
+    /**
+     * Write {@code Java Objects} to a table
+     *
+     * @param table  The table you'd like to write to
+     * @param object The object you'd like to insert
+     * @throws SQLException if there is an error communicating with the database
+     */
+    public void insert(String table, Object object) throws SQLException {
+        ArrayList<String> keys = new ArrayList<>();
+        ArrayList<String> values = new ArrayList<>();
+
+        // Adds all fields to the keys and values ArrayLists
+        for (Field field : object.getClass().getDeclaredFields()) {
+            String key = field.getName();
+
+            // Checks the field's annotations
+            if (field.isAnnotationPresent(DontSave.class)) continue;
+            if (field.isAnnotationPresent(com.seailz.databaseapi.annotation.Column.class)) {
+                // If there is an annotation, use the annotation's name instead of the field's name
+                key = field.getAnnotation(com.seailz.databaseapi.annotation.Column.class).value();
+                return;
+            }
+
+            keys.add(key);
+            try {
+                field.setAccessible(true);
+                values.add(field.get(object).toString());
+            } catch (IllegalAccessException e) {
+                e.printStackTrace();
+            }
+        }
+
+        // Adds all fields from the superclass to the keys and values ArrayLists
+        for (Field field : object.getClass().getSuperclass().getDeclaredFields()) {
+            String key = field.getName();
+
+            // Checks the field's annotations
+            if (field.isAnnotationPresent(DontSave.class)) continue;
+            if (field.isAnnotationPresent(com.seailz.databaseapi.annotation.Column.class)) {
+                // If there is an annotation, use the annotation's name instead of the field's name
+                key = field.getAnnotation(com.seailz.databaseapi.annotation.Column.class).value();
+                return;
+            }
+
+            keys.add(key);
+            try {
+                field.setAccessible(true);
+                values.add(field.get(object).toString());
+            } catch (IllegalAccessException e) {
+                e.printStackTrace();
+            }
+        }
+
+        // Loops through and puts everything in a HashMap
+        HashMap<String, String> keyValuesHashMap = new HashMap<>();
+        for (int i = 0; i < keys.size(); i++) {
+            keyValuesHashMap.put(keys.get(i), values.get(i));
+        }
+
+        // Writes the HashMap to the table
+        insert(table, keyValuesHashMap);
+
+        if (debug)
+            log("Wrote object to table: " + table);
+    }
+
+    /**
+     * Reads {@code Java Objects} from a table
+     *
+     * @param table The table you'd like to read from
+     * @param key   The key you'd like to read from
+     * @param value The value you'd like to read from
+     * @param clazz The class you'd like to read into
+     * @return The object you read into
+     * @throws SQLException              if there is an error communicating with the database
+     * @throws IllegalAccessException    if there is an error accessing the object
+     * @throws InstantiationException    if there is an error instantiating the object
+     * @throws InvocationTargetException if there is an error invoking the object
+     */
+    public Object get(String table, String key, String value, Class<?> clazz) throws SQLException, InvocationTargetException, InstantiationException, IllegalAccessException {
+        String statement = "SELECT * FROM `" + table + "` WHERE `" + key + "` = '" + value + "';";
+        if (debug)
+            log("Reading object from table: " + table + " with key: " + key + " and value: " + value);
+        ResultSet resultSet = new Statement(statement, connection).executeWithResults();
+
+        // Creates a new instance of the class
+        Object object;
+        Constructor<?> constructor = retrieveConstructor(clazz);
+        ArrayList<Object> parameters = new ArrayList<>();
+
+        HashMap<String, Object> keyValuesHashMap = new HashMap<>();
+
+        while (resultSet.next()) {
+            // Loops through all the columns and adds them to the HashMap
+            for (int i = 1; i <= resultSet.getMetaData().getColumnCount(); i++) {
+                keyValuesHashMap.put(resultSet.getMetaData().getColumnName(i), resultSet.getObject(i));
+            }
+        }
+
+        for (Parameter p : constructor.getParameters()) {
+            if (hasAnnotation(p))
+                parameters.add(keyValuesHashMap.get(p.getAnnotation(com.seailz.databaseapi.annotation.Column.class).value()));
+        }
+
+        if (debug)
+            log("Read object from table: " + table);
+        object = constructor.newInstance(parameters.toArray());
+        return object;
+    }
+
+    /**
+     * Retrieves the correct constructor for a class
+     *
+     * @param clazz The class you'd like to get the constructor for
+     * @return The constructor you retrieved
+     */
+    private Constructor<?> retrieveConstructor(Class<?> clazz) {
+        ArrayList<Constructor<?>> constructors = new ArrayList<>(Arrays.asList(clazz.getConstructors()));
+        AtomicReference<Constructor<?>> validConstructor = new AtomicReference<>();
+        for (Constructor<?> constructor : constructors) {
+            constructor.setAccessible(true);
+            Arrays.stream(constructor.getAnnotations()).forEach(annotation -> {
+                if (annotation.annotationType().equals(DatabaseConstructor.class)) {
+                    validConstructor.set(constructor);
+                }
+            });
+        }
+        return validConstructor.get();
+    }
+
+    /**
+     * Checks if a parameter has the {@link com.seailz.databaseapi.annotation.Column} annotation
+     *
+     * @param param The parameter you'd like to check
+     * @return Whether the parameter has the {@link com.seailz.databaseapi.annotation.Column} annotation
+     */
+    private boolean hasAnnotation(Parameter param) {
+        return param.isAnnotationPresent(com.seailz.databaseapi.annotation.Column.class);
+    }
+
+    /**
+     * Logs a message to the console
+     *
+     * @param text The message you'd like to log
+     */
+    private void log(@NotNull String text) {
+        System.out.println("[Database] " + text);
+    }
 }
+
