@@ -332,7 +332,7 @@ public class Database {
      * @author Seailz
      */
     public void delete(@NotNull String table, @NotNull String key, @NotNull String value) throws SQLException {
-        String statement = "DELETE FROM '" + table + "' WHERE '" + key + "'='" + value + "'";
+        String statement = "DELETE FROM `" + table + "` WHERE '" + key + "'='" + value + "'";
         new Statement(statement, connection).execute();
         if (debug)
             System.out.println("[Database] Deleting from table: " + statement);
