@@ -546,8 +546,8 @@ public class Database {
      * @param type   The type of the column
      * @throws SQLException if there is an error communicating with the database
      */
-    public void addColumnToTable(String table, String column, String type) throws SQLException {
-        String statement = "ALTER TABLE `" + table + "` ADD `" + column + "` " + type + ";";
+    public void addColumnToTable(String table, String column, String type, int amount) throws SQLException {
+        String statement = "ALTER TABLE `" + table + "` ADD `" + column + "` " + type + "(" + amount + ");";
         if (debug)
             log("Adding column to table: " + table + " with name: " + column + " and type: " + type);
         new Statement(statement, connection).execute();
