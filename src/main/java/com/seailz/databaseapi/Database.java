@@ -871,6 +871,77 @@ public class Database {
     }
 
     /**
+     * Write multiple {@code Java Objects} to a table
+     *
+     * @param table  The table you'd like to write to
+     * @param objects The objects you'd like to insert
+     */
+    public void insertList(String table, ArrayList<Object> objects) {
+        objects.forEach(object -> {
+            ArrayList<String> keys = new ArrayList<>();
+            ArrayList<String> values = new ArrayList<>();
+
+            // Adds all fields to the keys and values ArrayLists
+            for (Field field : object.getClass().getDeclaredFields()) {
+                String key = field.getName();
+
+                // Checks the field's annotations
+                if (field.isAnnotationPresent(DontSave.class)) continue;
+                if (field.isAnnotationPresent(com.seailz.databaseapi.annotation.Column.class)) {
+                    // If there is an annotation, use the annotation's name instead of the field's name
+                    key = field.getAnnotation(com.seailz.databaseapi.annotation.Column.class).value();
+                    return;
+                }
+
+                keys.add(key);
+                try {
+                    field.setAccessible(true);
+                    values.add(field.get(object).toString());
+                } catch (IllegalAccessException e) {
+                    e.printStackTrace();
+                }
+            }
+
+            // Adds all fields from the superclass to the keys and values ArrayLists
+            for (Field field : object.getClass().getSuperclass().getDeclaredFields()) {
+                String key = field.getName();
+
+                // Checks the field's annotations
+                if (field.isAnnotationPresent(DontSave.class)) continue;
+                if (field.isAnnotationPresent(com.seailz.databaseapi.annotation.Column.class)) {
+                    // If there is an annotation, use the annotation's name instead of the field's name
+                    key = field.getAnnotation(com.seailz.databaseapi.annotation.Column.class).value();
+                    return;
+                }
+
+                keys.add(key);
+                try {
+                    field.setAccessible(true);
+                    values.add(field.get(object).toString());
+                } catch (IllegalAccessException e) {
+                    e.printStackTrace();
+                }
+            }
+
+            // Loops through and puts everything in a HashMap
+            HashMap<String, String> keyValuesHashMap = new HashMap<>();
+            for (int i = 0; i < keys.size(); i++) {
+                keyValuesHashMap.put(keys.get(i), values.get(i));
+            }
+
+            // Writes the HashMap to the table
+            try {
+                insert(table, keyValuesHashMap);
+            } catch (SQLException e) {
+                e.printStackTrace();
+            }
+
+            if (debug)
+                log("Wrote object to table: " + table);
+        });
+    }
+
+    /**
      * Reads {@code Java Objects} from a table
      *
      * @param table The table you'd like to read from
