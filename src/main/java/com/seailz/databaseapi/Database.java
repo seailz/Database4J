@@ -20,9 +20,7 @@ import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Parameter;
 import java.sql.*;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Level;
 
@@ -318,6 +316,47 @@ public class Database {
         if (debug)
             log("Getting value from table " + table + " failed");
         return null;
+    }
+
+    /**
+     * Get something from the database
+     * <p></p>
+     * <p>For example, if you wanted to get the details about a player,</p>
+     * <p>the key parameter would be "name" or whatever it is within your table</p>
+     * <p>and the value parameter would be the player's name of whom you wish to get the details of.</p>
+     * <p></p>
+     * <p>The "column" parameter would be the specific detail you'd like to get. For example, </p>
+     * <p>if my table contained a "age" column, and I wanted to get the player's age,</p>
+     * <p>I'd set the column parameter to "age"</p>
+     * <p>
+     *
+     * @param table  the table you'd like to pull from
+     * @param key    The key you'd like to check
+     * @param value  The value that you'd like to check
+     * @param column The column you'd like to get
+     * @return An object
+     * @throws SQLException if there is an error retrieving the request value
+     */
+    @Nullable
+    public Optional<List<Object>> getList(@NotNull String table, @NotNull String key, @NotNull String value, @NotNull String column) throws SQLException {
+        String statement = "SELECT * FROM `" + table + "`";
+        ResultSet set = new Statement(statement, connection).executeWithResults();
+
+        if (debug)
+            log("Getting " + column + " from " + table + " where " + key + " = " + value);
+
+        List<Object> objects = new ArrayList<>();
+        while (set.next()) {
+            if (set.getObject(key).equals(value))
+                objects.add(set.getObject(column));
+        }
+
+        if (debug)
+            log("Getting value from table " + table + " failed");
+        if (objects.isEmpty())
+            return Optional.empty();
+
+        return Optional.of(objects);
     }
 
     /**
