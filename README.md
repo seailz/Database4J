@@ -12,7 +12,7 @@ Interact with your MySQL databases with ease.
 	<dependency>
 	    <groupId>com.github.seailz</groupId>
 	    <artifactId>databaseapi</artifactId>
-	    <version>2.1.1</version>
+	    <version>2.2.2</version>
 	</dependency>
   ```
 
