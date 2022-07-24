@@ -23,6 +23,7 @@ import java.sql.*;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Level;
+import java.util.stream.Collectors;
 
 /**
  * <p>A way to interact with databases easier than JDBC.</p>
@@ -876,7 +877,7 @@ public class Database {
      * @param table  The table you'd like to write to
      * @param objects The objects you'd like to insert
      */
-    public void insertList(String table, ArrayList<Object> objects) {
+    public void insertList(String table, List<?> objects) {
         objects.forEach(object -> {
             ArrayList<String> keys = new ArrayList<>();
             ArrayList<String> values = new ArrayList<>();
@@ -985,7 +986,7 @@ public class Database {
         return object;
     }
 
-    /**
+   /* /**
      * Reads {@code Java Objects} from a table
      *
      * @param table The table you'd like to read from
@@ -997,8 +998,8 @@ public class Database {
      * @throws IllegalAccessException    if there is an error accessing the object
      * @throws InstantiationException    if there is an error instantiating the object
      * @throws InvocationTargetException if there is an error invoking the object
-     */
-    public Optional<List<Object>> getList(String table, String key, String value, Class<?> clazz) throws SQLException, InvocationTargetException, InstantiationException, IllegalAccessException {
+     */ /*
+    public Optional<List<?>> getList(String table, String key, String value, Class<?> clazz) throws SQLException, InvocationTargetException, InstantiationException, IllegalAccessException {
         String statement = "SELECT * FROM `" + table + "` WHERE `" + key + "` = '" + value + "';";
         if (debug)
             log("Reading objects from table: " + table + " with key: " + key + " and value: " + value);
@@ -1020,28 +1021,33 @@ public class Database {
             keyValuesHashMapList.add(keyValuesHashMap);
         }
 
+        for (HashMap<String, Object> stringObjectHashMap : keyValuesHashMapList) {
+            stringObjectHashMap.entrySet().stream().collect(Collectors.toMap(Map.Entry::getValue, Map.Entry::getKey));
+        }
+
         for (Parameter p : constructor.getParameters()) {
             if (hasAnnotation(p)) {
                 int i = 0;
                 for (HashMap<String, Object> keyValuesHashMap : keyValuesHashMapList) {
                     List<Object> parameters = new ArrayList<>();
+                    parameters = (List<Object>) parameters.get(keyValuesHashMapList.indexOf(keyValuesHashMap));
+
+                    parametersList.remove(i);
+
                     parameters.add(keyValuesHashMap.get(p.getAnnotation(com.seailz.databaseapi.annotation.Column.class).value()));
-                    if (!parametersList.isEmpty())
-                        parametersList.remove(i);
                     parametersList.add(i, parameters);
                     i++;
                 }
             }
         }
 
-        int index = 0;
-        keyValuesHashMapList.forEach(keyValue -> {
-            try {
-                returnObjects.add(constructor.newInstance(parametersList.get(index).toArray()));
-            } catch (InstantiationException | IllegalAccessException | InvocationTargetException e) {
-                e.printStackTrace();
-            }
-        });
+        System.out.println(parametersList);
+
+        int i = 0;
+        for (HashMap<String, Object> stringObjectHashMap : keyValuesHashMapList) {
+            returnObjects.add(constructor.newInstance(parametersList.get(i).toArray()));
+            i++;
+        }
 
         if (debug)
             log("Read objects from table: " + table);
@@ -1050,6 +1056,70 @@ public class Database {
         if (returnObjects.isEmpty())
             return Optional.empty();
         return Optional.of(returnObjects);
+    } */
+
+    public Optional<List<?>> getList(String key, String value, String table, Class<?> clazz) throws SQLException, InvocationTargetException, InstantiationException, IllegalAccessException {
+        String statement = "SELECT * FROM `" + table + "` WHERE `" + key + "` = '" + value + "';";
+        if (debug)
+            log("Reading objects from table: " + table + " with key: " + key + " and value: " + value);
+        ResultSet resultSet = new Statement(statement, connection).executeWithResults();
+        List<Object> returnObjects = new ArrayList<>();
+
+        int i = 0;
+        while (resultSet.next()) {
+            returnObjects.add(get(table, key, value, clazz, i));
+            i++;
+        }
+
+        return returnObjects.isEmpty() ? Optional.empty() : Optional.of(returnObjects);
+    }
+
+    /**
+     * Reads {@code Java Objects} from a table
+     *
+     * @param table The table you'd like to read from
+     * @param key   The key you'd like to read from
+     * @param value The value you'd like to read from
+     * @param clazz The class you'd like to read into
+     * @return The object you read into
+     * @throws SQLException              if there is an error communicating with the database
+     * @throws IllegalAccessException    if there is an error accessing the object
+     * @throws InstantiationException    if there is an error instantiating the object
+     * @throws InvocationTargetException if there is an error invoking the object
+     */
+    private Object get(String table, String key, String value, Class<?> clazz, int index) throws SQLException, InvocationTargetException, InstantiationException, IllegalAccessException {
+        String statement = "SELECT * FROM `" + table + "` WHERE `" + key + "` = '" + value + "';";
+        if (debug)
+            log("Reading object from table: " + table + " with key: " + key + " and value: " + value);
+        ResultSet resultSet = new Statement(statement, connection).executeWithResults();
+
+        // Creates a new instance of the class
+        Object object;
+        Constructor<?> constructor = retrieveConstructor(clazz);
+        ArrayList<Object> parameters = new ArrayList<>();
+
+        HashMap<String, Object> keyValuesHashMap = new HashMap<>();
+
+        int resultSetIndex = 0;
+        while (resultSet.next()) {
+            // Loops through all the columns and adds them to the HashMap
+            if (resultSetIndex == index) {
+                for (int i = 1; i <= resultSet.getMetaData().getColumnCount(); i++) {
+                    keyValuesHashMap.put(resultSet.getMetaData().getColumnName(i), resultSet.getObject(i));
+                }
+            }
+            resultSetIndex++;
+        }
+
+        for (Parameter p : constructor.getParameters()) {
+            if (hasAnnotation(p))
+                parameters.add(keyValuesHashMap.get(p.getAnnotation(com.seailz.databaseapi.annotation.Column.class).value()));
+        }
+
+        if (debug)
+            log("Read object from table: " + table);
+        object = constructor.newInstance(parameters.toArray());
+        return object;
     }
 
     /**
