@@ -361,6 +361,40 @@ public class Database {
     }
 
     /**
+     * Get something from the database
+     * <p></p>
+     * <p>The "column" parameter would be the specific detail you'd like to get. For example, </p>
+     * <p>if my table contained a "age" column, and I wanted to get the player's age,</p>
+     * <p>I'd set the column parameter to "age"</p>
+     * <p>
+     *
+     * @param table  the table you'd like to pull from
+     * @param column The column you'd like to get
+     * @return An object
+     * @throws SQLException if there is an error retrieving the request value
+     */
+    @Nullable
+    public Optional<List<Object>> getList(@NotNull String table, @NotNull String column) throws SQLException {
+        String statement = "SELECT * FROM `" + table + "`";
+        ResultSet set = new Statement(statement, connection).executeWithResults();
+
+        if (debug)
+            log("Getting " + column + " from " + table);
+
+        List<Object> objects = new ArrayList<>();
+        while (set.next()) {
+            objects.add(set.getObject(column));
+        }
+
+        if (debug)
+            log("Getting value from table " + table + " failed");
+
+        if (objects.isEmpty())
+            return Optional.empty();
+        return Optional.of(objects);
+    }
+
+    /**
      * Check if a table exists
      *
      * @param tableName The table you'd like to check
@@ -1015,6 +1049,32 @@ public class Database {
     }
 
     /**
+     * Reads a list of {@code Java Objects} from a table. This method assumes that every row in the list represents the same object.
+     * @param table The table you'd like to read from
+     * @param clazz The type of class you want to return
+     * @return An Optional class either containing a List<?> or nothing if it didn't find any results</?>
+     * @throws SQLException If there is an error communicating with the database
+     * @throws InvocationTargetException If there is an error invoking the object
+     * @throws InstantiationException If there is an error instantiating the object
+     * @throws IllegalAccessException If there is an error accessing some parameters within the object
+     */
+    public Optional<List<?>> getList(String table, Class<?> clazz) throws SQLException, InvocationTargetException, InstantiationException, IllegalAccessException {
+        String statement = "SELECT * FROM `" + table + "`;";
+        if (debug)
+            log("Reading objects from table: " + table);
+        ResultSet resultSet = new Statement(statement, connection).executeWithResults();
+        List<Object> returnObjects = new ArrayList<>();
+
+        int i = 0;
+        while (resultSet.next()) {
+            returnObjects.add(get(table, clazz, i));
+            i++;
+        }
+
+        return returnObjects.isEmpty() ? Optional.empty() : Optional.of(returnObjects);
+    }
+
+    /**
      * Reads {@code Java Objects} from a table
      *
      * @param table The table you'd like to read from
@@ -1031,6 +1091,52 @@ public class Database {
         String statement = "SELECT * FROM `" + table + "` WHERE `" + key + "` = '" + value + "';";
         if (debug)
             log("Reading object from table: " + table + " with key: " + key + " and value: " + value);
+        ResultSet resultSet = new Statement(statement, connection).executeWithResults();
+
+        // Creates a new instance of the class
+        Object object;
+        Constructor<?> constructor = retrieveConstructor(clazz);
+        ArrayList<Object> parameters = new ArrayList<>();
+
+        HashMap<String, Object> keyValuesHashMap = new HashMap<>();
+
+        int resultSetIndex = 0;
+        while (resultSet.next()) {
+            // Loops through all the columns and adds them to the HashMap
+            if (resultSetIndex == index) {
+                for (int i = 1; i <= resultSet.getMetaData().getColumnCount(); i++) {
+                    keyValuesHashMap.put(resultSet.getMetaData().getColumnName(i), resultSet.getObject(i));
+                }
+            }
+            resultSetIndex++;
+        }
+
+        for (Parameter p : constructor.getParameters()) {
+            if (hasAnnotation(p))
+                parameters.add(keyValuesHashMap.get(p.getAnnotation(com.seailz.databaseapi.annotation.Column.class).value()));
+        }
+
+        if (debug)
+            log("Read object from table: " + table);
+        object = constructor.newInstance(parameters.toArray());
+        return object;
+    }
+
+    /**
+     * Reads {@code Java Objects} from a table
+     *
+     * @param table The table you'd like to read from
+     * @param clazz The class you'd like to read into
+     * @return The object you read into
+     * @throws SQLException              if there is an error communicating with the database
+     * @throws IllegalAccessException    if there is an error accessing the object
+     * @throws InstantiationException    if there is an error instantiating the object
+     * @throws InvocationTargetException if there is an error invoking the object
+     */
+    private Object get(String table, Class<?> clazz, int index) throws SQLException, InvocationTargetException, InstantiationException, IllegalAccessException {
+        String statement = "SELECT * FROM `" + table + "`;";
+        if (debug)
+            log("Reading object from table: " + table);
         ResultSet resultSet = new Statement(statement, connection).executeWithResults();
 
         // Creates a new instance of the class
@@ -1100,5 +1206,6 @@ public class Database {
     private void log(@NotNull String text) {
         System.out.println("[Database] " + text);
     }
+
 }
 
