@@ -986,78 +986,18 @@ public class Database {
         return object;
     }
 
-   /* /**
-     * Reads {@code Java Objects} from a table
-     *
+    /**
+     * Reads a list of {@code Java Objects} from a table that match the where clause
+     * @param key The key you'd like to use
+     * @param value The value the key should be
      * @param table The table you'd like to read from
-     * @param key   The key you'd like to read from
-     * @param value The value you'd like to read from
-     * @param clazz The class you'd like to read into
-     * @return The object you read into
-     * @throws SQLException              if there is an error communicating with the database
-     * @throws IllegalAccessException    if there is an error accessing the object
-     * @throws InstantiationException    if there is an error instantiating the object
-     * @throws InvocationTargetException if there is an error invoking the object
-     */ /*
-    public Optional<List<?>> getList(String table, String key, String value, Class<?> clazz) throws SQLException, InvocationTargetException, InstantiationException, IllegalAccessException {
-        String statement = "SELECT * FROM `" + table + "` WHERE `" + key + "` = '" + value + "';";
-        if (debug)
-            log("Reading objects from table: " + table + " with key: " + key + " and value: " + value);
-        ResultSet resultSet = new Statement(statement, connection).executeWithResults();
-
-        // Creates a new instance of the class
-        List<Object> returnObjects = new ArrayList<>();
-        Constructor<?> constructor = retrieveConstructor(clazz);
-        List<List<Object>> parametersList = new ArrayList<>();
-
-        List<HashMap<String, Object>> keyValuesHashMapList = new ArrayList<>();
-
-        while (resultSet.next()) {
-            // Loops through all the columns and adds them to the HashMap
-            HashMap<String, Object> keyValuesHashMap = new HashMap<>();
-            for (int i = 1; i <= resultSet.getMetaData().getColumnCount(); i++) {
-                keyValuesHashMap.put(resultSet.getMetaData().getColumnName(i), resultSet.getObject(i));
-            }
-            keyValuesHashMapList.add(keyValuesHashMap);
-        }
-
-        for (HashMap<String, Object> stringObjectHashMap : keyValuesHashMapList) {
-            stringObjectHashMap.entrySet().stream().collect(Collectors.toMap(Map.Entry::getValue, Map.Entry::getKey));
-        }
-
-        for (Parameter p : constructor.getParameters()) {
-            if (hasAnnotation(p)) {
-                int i = 0;
-                for (HashMap<String, Object> keyValuesHashMap : keyValuesHashMapList) {
-                    List<Object> parameters = new ArrayList<>();
-                    parameters = (List<Object>) parameters.get(keyValuesHashMapList.indexOf(keyValuesHashMap));
-
-                    parametersList.remove(i);
-
-                    parameters.add(keyValuesHashMap.get(p.getAnnotation(com.seailz.databaseapi.annotation.Column.class).value()));
-                    parametersList.add(i, parameters);
-                    i++;
-                }
-            }
-        }
-
-        System.out.println(parametersList);
-
-        int i = 0;
-        for (HashMap<String, Object> stringObjectHashMap : keyValuesHashMapList) {
-            returnObjects.add(constructor.newInstance(parametersList.get(i).toArray()));
-            i++;
-        }
-
-        if (debug)
-            log("Read objects from table: " + table);
-
-
-        if (returnObjects.isEmpty())
-            return Optional.empty();
-        return Optional.of(returnObjects);
-    } */
-
+     * @param clazz The type of class you want to return
+     * @return An Optional class either containing a List<?> or nothing if it didn't find any results</?>
+     * @throws SQLException If there is an error communicating with the database
+     * @throws InvocationTargetException If there is an error invoking the object
+     * @throws InstantiationException If there is an error instantiating the object
+     * @throws IllegalAccessException If there is an error accessing some parameters within the object
+     */
     public Optional<List<?>> getList(String key, String value, String table, Class<?> clazz) throws SQLException, InvocationTargetException, InstantiationException, IllegalAccessException {
         String statement = "SELECT * FROM `" + table + "` WHERE `" + key + "` = '" + value + "';";
         if (debug)
