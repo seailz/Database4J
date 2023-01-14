@@ -451,7 +451,7 @@ public class Database {
         }
 
         if (debug)
-            log("Inserting into table: " + table + " with values: " + values);
+            log("Inserting into table: " + table + " with values: " + values + "with statement: " + statement);
         prepStatement.executeUpdate();
     }
 
