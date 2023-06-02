@@ -864,7 +864,10 @@ public class Database {
             keys.add(key);
             try {
                 field.setAccessible(true);
-                values.add(field.get(object).toString());
+                Object fie = field.get(object);
+                if (fie == null) {
+                    values.add(null);
+                } else values.add(fie.toString());
             } catch (IllegalAccessException e) {
                 e.printStackTrace();
             }
