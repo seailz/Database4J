@@ -859,7 +859,6 @@ public class Database {
             if (field.isAnnotationPresent(com.seailz.databaseapi.annotation.Column.class)) {
                 // If there is an annotation, use the annotation's name instead of the field's name
                 key = field.getAnnotation(com.seailz.databaseapi.annotation.Column.class).value();
-                return;
             }
 
             keys.add(key);
